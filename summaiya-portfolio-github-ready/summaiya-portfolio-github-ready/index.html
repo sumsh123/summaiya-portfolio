@@ -9239,11 +9239,95 @@ html[data-final-theme] body #recommendations .approved-recommendations-section h
 
     let history = [];
 
-    function escapeText(value) {
-        return String(value ?? '');
+function escapeHTML(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function formatInlineMarkdown(text) {
+    let safe = escapeHTML(text);
+
+    // Inline code
+    safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // Italics
+    safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    return safe;
+}
+
+function formatAIMessage(content) {
+    const lines = String(content ?? '').split('\n');
+    let html = '';
+    let listType = null;
+
+    function closeList() {
+        if (listType) {
+            html += listType === 'ul' ? '</ul>' : '</ol>';
+            listType = null;
+        }
     }
 
-    function addMessage(role, content, extraClass = '') {
+    lines.forEach(rawLine => {
+        const line = rawLine.trim();
+
+        if (!line) {
+            closeList();
+            return;
+        }
+
+        // Markdown headings
+        const heading = line.match(/^#{1,3}\s+(.+)$/);
+        if (heading) {
+            closeList();
+            html += `<h4>${formatInlineMarkdown(heading[1])}</h4>`;
+            return;
+        }
+
+        // Bullet points
+        const bullet = line.match(/^[-•*]\s+(.+)$/);
+        if (bullet) {
+            if (listType !== 'ul') {
+                closeList();
+                html += '<ul>';
+                listType = 'ul';
+            }
+
+            html += `<li>${formatInlineMarkdown(bullet[1])}</li>`;
+            return;
+        }
+
+        // Numbered lists
+        const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+        if (numbered) {
+            if (listType !== 'ol') {
+                closeList();
+                html += '<ol>';
+                listType = 'ol';
+            }
+
+            html += `<li>${formatInlineMarkdown(numbered[1])}</li>`;
+            return;
+        }
+
+        closeList();
+
+        html += `<p>${formatInlineMarkdown(line)}</p>`;
+    });
+
+    closeList();
+
+    return html;
+}
+
+function addMessage(role, content, extraClass = '') {
         const wrap = document.createElement('div');
         wrap.className =
             'ai-message ' +
@@ -9256,7 +9340,11 @@ html[data-final-theme] body #recommendations .approved-recommendations-section h
 
         const bubble = document.createElement('div');
         bubble.className = 'ai-message-bubble';
-        bubble.textContent = escapeText(content);
+        if (role === 'assistant') {
+    bubble.innerHTML = formatAIMessage(content);
+} else {
+    bubble.textContent = String(content ?? '');
+}
 
         wrap.appendChild(label);
         wrap.appendChild(bubble);
