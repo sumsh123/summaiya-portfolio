@@ -1,0 +1,9 @@
+{
+  "name": "summaiya-portfolio-os",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Summaiya Shoaib portfolio with Netlify Functions and Netlify Blobs",
+  "dependencies": {
+    "@netlify/blobs": "11.0.3"
+  }
+}
